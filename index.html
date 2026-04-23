@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>AI Emotional Companion</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+/* APP */
+.app {
+    width: 420px;
+    height: 92vh;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(20px);
+    border-radius: 22px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* HEADER */
+.header {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+/* EMOTION */
+#emotionBadge {
+    text-align: center;
+    margin: 8px 0;
+    padding: 6px 14px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px;
+    font-size: 13px;
+}
+
+/* CHAT */
+#chatContainer {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* MESSAGE */
+.message {
+    margin: 6px 0;
+    padding: 10px 14px;
+    border-radius: 18px;
+    max-width: 70%;
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.user {
+    background: linear-gradient(135deg,#00ff99,#00cc66);
+    align-self: flex-end;
+    color: black;
+}
+
+.bot {
+    background: #2a2a2a;
+    align-self: flex-start;
+}
+
+/* BOT EMOJI */
+.bot-emoji {
+    font-size: 20px;
+}
+
+/* INPUT */
+#inputArea {
+    display: flex;
+    gap: 8px;
+}
+
+#userInput {
+    flex: 1;
+    padding: 14px;
+    border-radius: 25px;
+    border: none;
+    background: rgba(255,255,255,0.1);
+    color: white;
+}
+
+button {
+    background: #00ff99;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+/* CAMERA */
+#video {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    border: 3px solid #00ff99;
+    object-fit: cover;
+}
+
+/* TYPING */
+.typing {
+    display: flex;
+    gap: 4px;
+}
+.dot {
+    width: 6px;
+    height: 6px;
+    background: white;
+    border-radius: 50%;
+    animation: blink 1.4s infinite;
+}
+@keyframes blink {
+    0%,80%,100% {opacity:0;}
+    40% {opacity:1;}
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<div class="header">🤖 AI Emotional Companion</div>
+<div id="emotionBadge">Emotion: Detecting...</div>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas" style="display:none;"></canvas>
+
+<div id="chatContainer"></div>
+
+<div id="inputArea">
+<input type="text" id="userInput" placeholder="Type...">
+<button onclick="sendMessage()">➤</button>
+<button onclick="startListening()">🎤</button>
+</div>
+
+</div>
+
+<script>
+const chatContainer = document.getElementById("chatContainer");
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const emotionBadge = document.getElementById("emotionBadge");
+
+let currentEmotion = "neutral";
+let isDetecting = false;
+
+/* CAMERA */
+navigator.mediaDevices.getUserMedia({ video: true })
+.then(stream => video.srcObject = stream);
+
+/* ⚡ ULTRA FAST EMOTION DETECTION (~1 sec) */
+setInterval(() => {
+
+    if (isDetecting || video.videoWidth === 0) return;
+    isDetecting = true;
+
+    const ctx = canvas.getContext("2d");
+
+    // 🔥 SMALL FRAME = FAST
+    canvas.width = 160;
+    canvas.height = 120;
+
+    ctx.drawImage(video, 0, 0, 160, 120);
+
+    fetch("/detect_emotion", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            image: canvas.toDataURL("image/jpeg", 0.3) // HIGH compression
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        currentEmotion = data.emotion;
+        emotionBadge.innerText = "Emotion: " + currentEmotion;
+    })
+    .catch(() => {})
+    .finally(() => {
+        isDetecting = false;
+    });
+
+}, 1000);
+
+/* EMOJI */
+function getBotEmoji() {
+    if (currentEmotion === "happy") return "😊";
+    if (currentEmotion === "sad") return "😢";
+    return "😐";
+}
+
+/* MESSAGE */
+function addMessage(text, sender, typing=false) {
+    const msg = document.createElement("div");
+    msg.classList.add("message", sender);
+
+    if (sender === "bot") {
+        const emoji = document.createElement("span");
+        emoji.classList.add("bot-emoji");
+        emoji.innerText = getBotEmoji();
+        msg.appendChild(emoji);
+    }
+
+    const textDiv = document.createElement("div");
+
+    if (typing) {
+        textDiv.innerHTML = `<div class="typing">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>`;
+    } else {
+        textDiv.innerText = text;
+    }
+
+    msg.appendChild(textDiv);
+    chatContainer.appendChild(msg);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+/* ⚡ FAST CHAT */
+function sendMessage() {
+    const input = document.getElementById("userInput");
+    const message = input.value;
+    if (!message) return;
+
+    addMessage(message, "user");
+    input.value = "";
+
+    addMessage("...", "bot");
+
+    fetch("/chat", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({message})
+    })
+    .then(res => res.json())
+    .then(data => {
+        chatContainer.lastChild.remove();
+        addMessage(data.reply, "bot");
+    })
+    .catch(() => {
+        chatContainer.lastChild.remove();
+        addMessage("⚠️ Slow network", "bot");
+    });
+}
+
+/* VOICE */
+function startListening() {
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = "en-US";
+    recognition.onresult = e => {
+        document.getElementById("userInput").value = e.results[0][0].transcript;
+    };
+    recognition.start();
+}
+
+/* ENTER */
+document.getElementById("userInput").addEventListener("keypress", e => {
+    if (e.key === "Enter") sendMessage();
+});
+</script>
+
+</body>
+</html>
