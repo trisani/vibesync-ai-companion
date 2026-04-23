@@ -24,13 +24,14 @@ VibeSync is a real-time emotion-aware AI system that detects facial expressions 
 - LLM Integration (Ollama)  
 - Flask (if used)
 
-## 📷 Demo
-
-.png)
-
 # System Architecture
 1. Webcam input → Frame capture  
 2. Emotion detection (DeepFace)  
 3. Emotion-to-context mapping  
 4. LLM generates response  
 5. Output displayed (text/voice)
+
+# Demo
+Screenshot 2026-04-06 191941.png
+Screenshot 2026-04-06 184748.png
+
